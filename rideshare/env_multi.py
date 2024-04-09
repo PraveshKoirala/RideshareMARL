@@ -235,8 +235,8 @@ class MultiRideshareEnv(ParallelEnv):
                     wandb.log({f'RU{tag}': RU[e], f'CU{tag}': CU[e]})
                     wandb.log({f'RL{tag}': RL[e], f'CL{tag}': CL[e]})
                     wandb.log({f'PU{tag}': PU[e], f'PL{tag}': PL[e], f'PP{tag}': PP[e]})
-                    wandb.log({f'profits_U{tag}': profits_U, 'profits_L{tag}': profits_L})
-            wandb.log({'profits_U': profits_U, 'profits_L': profits_L})
+                    wandb.log({f'profits_U{tag}': profits_U[e], 'profits_L{tag}': profits_L[e]})
+            wandb.log({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})
         return  np.sum(profits_U), np.sum(profits_L), new_passenger_distribution, new_driver_distribution
 
     def step(self, actions):

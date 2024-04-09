@@ -117,14 +117,15 @@ if __name__ == "__main__":
     init_passenger_distribution = [2000., 3000., 5000.]
     init_driver_distribution = [1000., 5000., 2000.]
     # Set vector_state to false in order to use visual observations (significantly longer training time)
+    ts = 2*864000
     env_kwargs = {
         "OD":                                       np.array(OD),
         "C":                                        np.array(C),
         "init_passenger_distribution":              np.array(init_passenger_distribution),
         "init_driver_distribution":                 np.array(init_driver_distribution),
-        "change_range":     0.1,                    # only changes 0.1 per second
+        "change_range":     1,                      # only changes 0.1 per second
         "max_rate":         20.,                     # maximum charged per mile is 30
-        "max_timestep":     24 * 60 * 60,           # seconds in a day
+        "max_timestep":     ts,           # seconds in a day
         "lbd":              3.,                      # lambda
         "rp":               12.,                     # maximum rate public transportation charges
         "g":                5.,                      # gas cost
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     )
 
     # Train a model (takes ~5 minutes on a laptop CPU)
-    train(env_fn, steps=2*864000, seed=0, **env_kwargs)
+    train(env_fn, steps=ts, seed=0, **env_kwargs)
 
     # # Evaluate 10 games (takes ~10 seconds on a laptop CPU)
     # eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
