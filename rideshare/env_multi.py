@@ -3,6 +3,7 @@ import random
 from copy import copy
 
 import numpy as np
+import torch
 from pettingzoo.utils.env import ParallelEnv
 from torch.utils.tensorboard import SummaryWriter
 import wandb
@@ -52,6 +53,7 @@ class MultiRideshareEnv(ParallelEnv):
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
+            torch.manual_seed(seed)
 
         # Rates randomly initialized between the price range for each node
         RU = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))  # Rate for each edge
@@ -220,24 +222,26 @@ class MultiRideshareEnv(ParallelEnv):
                 # TODO: figure out if we're adding / removing. If we are, we have to adjust the population parameter.
 
 
-        # TODO: log stuff here
-        profits_U = alpha * (revenue_U - cost_U)
-        profits_L = alpha * (revenue_L - cost_L)
+        # These are instanteneous profits
+        profits_U = (revenue_U - cost_U)
+        profits_L = (revenue_L - cost_L)
+        update_dict = dict()
         if self.timestep % 10000 == 0:
             for i in range(self.N):
-                wandb.log({f'Au_{i}': Au[i], f'Al_{i}': Al[i]})
-                wandb.log({f'passenger_distribution{i}': new_passenger_distribution[i],
+                update_dict.update({f'Au_{i}': Au[i], f'Al_{i}': Al[i]})
+                update_dict.update({f'passenger_distribution{i}': new_passenger_distribution[i],
                            f'driver_distribution{i}': new_driver_distribution[i]})
                 for j in range(self.N):
                     if i == j: continue
                     e = (i, j)
                     tag = f'_{i}_{j}'
-                    wandb.log({f'RU{tag}': RU[e], f'CU{tag}': CU[e]})
-                    wandb.log({f'RL{tag}': RL[e], f'CL{tag}': CL[e]})
-                    wandb.log({f'PU{tag}': PU[e], f'PL{tag}': PL[e], f'PP{tag}': PP[e]})
-                    wandb.log({f'profits_U{tag}': profits_U[e], 'profits_L{tag}': profits_L[e]})
-            wandb.log({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})
-        return  np.sum(profits_U), np.sum(profits_L), new_passenger_distribution, new_driver_distribution
+                    update_dict.update({f'RU{tag}': RU[e], f'CU{tag}': CU[e]})
+                    update_dict.update({f'RL{tag}': RL[e], f'CL{tag}': CL[e]})
+                    update_dict.update({f'PU{tag}': PU[e], f'PL{tag}': PL[e], f'PP{tag}': PP[e]})
+                    update_dict.update({f'profits_U{tag}': profits_U[e], 'profits_L{tag}': profits_L[e]})
+            update_dict.update({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})
+        wandb.log(update_dict)
+        return np.sum(profits_U), np.sum(profits_L), new_passenger_distribution, new_driver_distribution
 
     def step(self, actions):
         self.timestep += 1
@@ -267,8 +271,9 @@ class MultiRideshareEnv(ParallelEnv):
         self.state = (RU, CU, RL, CL, Au, Al, PU, PL, PP, passenger_distribution, driver_distribution)
         observations = {a: self.flatten_obs(self.state) for a in self.agents}
 
-        rewards = {"U": np.sum(profit_U),
-                   "L": np.sum(profit_L)}
+        # Scale reward for stability
+        rewards = {"U": np.sum(profit_U)    * self.alpha,
+                   "L": np.sum(profit_L)    * self.alpha}
 
         # agents never really terminate.
         terminations = {a: False for a in self.agents}
@@ -288,7 +293,7 @@ class MultiRideshareEnv(ParallelEnv):
         #   the prevailing rate and commission of both agents (ru, cu, rl, cl)
         #   current supply / demand market activity (au, al, pu, pl, pp)
         # RU, CU, RL, CL, Au, Al, PU, PL, PP, passenger_distribution, driver_distribution
-        from gymnasium.spaces import Box, Dict
+        from gymnasium.spaces import Box
         l = self.g
         h = self.max_rate
         # The true space looks like this but using a dict space is too much trouble when it comes to training
