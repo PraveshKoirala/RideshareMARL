@@ -238,7 +238,7 @@ class MultiRideshareEnv(ParallelEnv):
                     update_dict.update({f'RU{tag}': RU[e], f'CU{tag}': CU[e]})
                     update_dict.update({f'RL{tag}': RL[e], f'CL{tag}': CL[e]})
                     update_dict.update({f'PU{tag}': PU[e], f'PL{tag}': PL[e], f'PP{tag}': PP[e]})
-                    update_dict.update({f'profits_U{tag}': profits_U[e], 'profits_L{tag}': profits_L[e]})
+                    update_dict.update({f'profits_U{tag}': profits_U[e], f'profits_L{tag}': profits_L[e]})
             update_dict.update({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})
         wandb.log(update_dict)
         return np.sum(profits_U), np.sum(profits_L), new_passenger_distribution, new_driver_distribution
@@ -252,10 +252,12 @@ class MultiRideshareEnv(ParallelEnv):
         CL_d = actions["L"][self.N, :]
         RU, CU, RL, CL, Au, Al, PU, PL, PP, passenger_distribution, driver_distribution = self.state
 
-        RU += RU_d
-        CU += CU_d
-        RL += RL_d
-        CL += CL_d
+        interp = lambda r: r * (self.max_rate - self.g) + self.g
+
+        RU = interp(RU_d)
+        CU = interp(CU_d)
+        RL = interp(RL_d)
+        CL = interp(CL_d)
 
         RU = np.clip(RU, a_min=self.g, a_max=self.max_rate)
         CU = np.clip(CU, a_min=self.g, a_max=self.max_rate)
