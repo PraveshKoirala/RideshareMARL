@@ -249,7 +249,7 @@ class MultiRideshareEnv(ParallelEnv):
         RU_d = actions["U"][:self.N, :]
         CU_d = actions["U"][self.N:, :]
         RL_d = actions["L"][:self.N, :]
-        CL_d = actions["L"][self.N, :]
+        CL_d = actions["L"][self.N:, :]
         RU, CU, RL, CL, Au, Al, PU, PL, PP, passenger_distribution, driver_distribution = self.state
 
         interp = lambda r: r * (self.max_rate - self.g) + self.g

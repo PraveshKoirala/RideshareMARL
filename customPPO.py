@@ -84,9 +84,9 @@ class PPO(nn.Module):
         self.data = ReplayBuffer(action_prob_exist=True, max_size=self.args.traj_length, state_dim=state_dim,
                                  num_action=action_dim)
         self.actor = Actor(self.args.layer_num, state_dim, action_dim, self.args.hidden_dim, \
-                           self.args.activation_function, self.args.last_activation, self.args.trainable_std)
+                           self.args.activation_function, self.args.last_activation_actor, self.args.trainable_std)
         self.critic = Critic(self.args.layer_num, state_dim, 1, \
-                             self.args.hidden_dim, self.args.activation_function, self.args.last_activation)
+                             self.args.hidden_dim, self.args.activation_function, self.args.last_activation_critic)
 
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.args.actor_lr)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.args.critic_lr)
