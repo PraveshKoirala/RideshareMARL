@@ -19,7 +19,7 @@ class MultiRideshareEnv(ParallelEnv):
         self.render_mode = 'text'
         self.possible_agents = ["U", "L"]
         # by how much they may change their rates/commission per iteration
-        self.change_range = kwargs["change_range"]
+        self.change_rate = kwargs["change_rate"]
         self.max_rate = kwargs["max_rate"]  # Maximum rates
         self.OD = kwargs["OD"]  # the OD matrix
         self.C = kwargs["C"]  # Distance matrix
@@ -36,6 +36,7 @@ class MultiRideshareEnv(ParallelEnv):
         self.passenger_population = sum(self.init_passenger_distribution)
         self.driver_population = sum(self.init_driver_distribution)
         self.alpha = kwargs["alpha"]
+        self.mode = kwargs["mode"]              # delta for delta actions and interp for interpolations
         self.validate()
 
     def validate(self):
@@ -47,7 +48,7 @@ class MultiRideshareEnv(ParallelEnv):
         # assert np.sum(self.OD) == 1., "OD matrix must sum to 1"
         # assert np.all(np.diag(self.OD) == 0.), "Diagonal of OD matrix is 0"
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed, options=None):
         self.agents = copy(self.possible_agents)
         self.timestep = 0
         if seed is not None:
@@ -151,7 +152,8 @@ class MultiRideshareEnv(ParallelEnv):
                     PP_[i, j] = pp_
                     # We don't really care about the matching constraint
                     # calculate instantaneous profit for drivers
-                    profit += num_passengers * self.C[i, j] * (pu_ * (CU[i, j] - g) + pl_ * (CL[i, j] - g))
+                    profit +=  self.C[i, j] * (pu_ * (CU[i, j] - g) + pl_ * (CL[i, j] - g))
+                    # profit += num_passengers * self.C[i, j] * (pu_ * (CU[i, j] - g) + pl_ * (CL[i, j] - g))
 
             if profit > max_profit:
                 max_profit = profit
@@ -194,7 +196,7 @@ class MultiRideshareEnv(ParallelEnv):
                 cost_U[e] += num_trips_uber * self.C[e] * CU[e]
                 revenue_L[e] += num_trips_lyft * self.C[e] * RL[e]
                 cost_L[e] += num_trips_lyft * self.C[e] * CL[e]
-                revenue_P[e] += num_passengers_public * self.C[e] * self.g
+                revenue_P[e] += num_passengers_public * self.C[e] * self.rp
 
                 if num_drivers_lyft > 0.:
                     passenger_wait_costs_L[e] = self.lbd * num_passengers_lyft / num_drivers_lyft
@@ -251,13 +253,20 @@ class MultiRideshareEnv(ParallelEnv):
         RL_d = actions["L"][:self.N, :]
         CL_d = actions["L"][self.N:, :]
         RU, CU, RL, CL, Au, Al, PU, PL, PP, passenger_distribution, driver_distribution = self.state
-
-        interp = lambda r: r * (self.max_rate - self.g) + self.g
-
-        RU = interp(RU_d)
-        CU = interp(CU_d)
-        RL = interp(RL_d)
-        CL = interp(CL_d)
+        if self.mode == "interp":
+            interp = lambda r: r * (self.max_rate - self.g) + self.g
+            RU = interp(RU_d)
+            CU = interp(CU_d)
+            RL = interp(RL_d)
+            CL = interp(CL_d)
+        elif self.mode == "delta":
+            # since sigmoidal, have to subtract -0.5 and multiply by 2 to bring to [-1, 1]
+            RU += 2 * self.change_rate * (RU_d-0.5)
+            CU += 2 * self.change_rate * (CU_d-0.5)
+            RL += 2 * self.change_rate * (RL_d-0.5)
+            CL += 2 * self.change_rate * (CL_d-0.5)
+        else:
+            raise Exception("Unknown mode")
 
         RU = np.clip(RU, a_min=self.g, a_max=self.max_rate)
         CU = np.clip(CU, a_min=self.g, a_max=self.max_rate)
@@ -322,4 +331,4 @@ class MultiRideshareEnv(ParallelEnv):
         from gymnasium.spaces import Box
         # for each agent, the action is the change in rate and commission per iteration
         shape = (2*self.N, self.N)
-        return Box(-self.change_range, self.change_range, shape=shape)
+        return Box(0, 1, shape=shape)
