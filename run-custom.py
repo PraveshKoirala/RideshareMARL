@@ -141,9 +141,9 @@ if args.load != 'no':
 score_lst = []
 state_lst = []
 
-
+seed = 42
 scoreU, score_L = 0.0, 0.0
-observations, infos = (env.reset(seed=100))
+observations, infos = (env.reset(seed=seed))
 state_ = observations[possible_agents[0]]   # agents share the observation so doesn't really matter which dict we pull from
 state = np.clip((state_ - state_rms.mean) / (state_rms.var ** 0.5 + 1e-8), -5, 5)
 for n_epi in range(args.epochs):
@@ -165,3 +165,4 @@ for n_epi in range(args.epochs):
     agent_U.agent.train_net(n_epi)
     agent_L.agent.train_net(n_epi)
     state_rms.update(np.vstack(state_lst))
+    env.reset(seed=seed)
