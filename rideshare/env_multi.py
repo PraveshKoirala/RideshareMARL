@@ -57,21 +57,23 @@ class MultiRideshareEnv(ParallelEnv):
             torch.manual_seed(seed)
 
         # Rates randomly initialized between the price range for each node
-        RU = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))  # Rate for each edge
-        # Commissions randomly initialized but greater than gas cost and less than the rates
-        CU = np.random.uniform(low=self.g, high=RU, size=(self.N, self.N))
-        RL = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))
-        CL = np.random.uniform(low=self.g, high=RL, size=(self.N, self.N))
+        # RU = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))  # Rate for each edge
+        # # Commissions randomly initialized but greater than gas cost and less than the rates
+        # CU = np.random.uniform(low=self.g, high=RU, size=(self.N, self.N))
+        # RL = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))
+        # CL = np.random.uniform(low=self.g, high=RL, size=(self.N, self.N))
 
-        # At each edge, uniformly want to take each platform
-        PU = np.ones((self.N, self.N)) * 1. / 3.
+        # At each edge
+        self.e = 0.1
+        PU = np.clip(0., 1., np.random.normal(1/3., 0.01, (self.N, self.N)))
         np.fill_diagonal(PU, 0.)
-        PL = np.copy(PU)
-        PP = np.copy(PU)
-
+        PL = np.clip(0., PU, np.random.normal(1/3., 0.01, (self.N, self.N)))
+        np.fill_diagonal(PL, 0.)
+        PP = 1 - PU - PL
+        np.fill_diagonal(PL, 0.)
         # At each node, uniformly want to drive for each platform
-        Au = np.repeat(1 / 2., self.N)
-        Al = np.repeat(1 / 2., self.N)
+        Au = np.clip(0, 1., np.random.normal(1 / 2., self.e, self.N))
+        Al = 1 - Au
         init_state = (
             Au, Al, PU, PL, PP, copy(self.init_passenger_distribution),
             copy(self.init_driver_distribution)
@@ -242,7 +244,8 @@ class MultiRideshareEnv(ParallelEnv):
                     update_dict.update({f'PU{tag}': PU[e], f'PL{tag}': PL[e], f'PP{tag}': PP[e]})
                     update_dict.update({f'profits_U{tag}': profits_U[e], f'profits_L{tag}': profits_L[e]})
             update_dict.update({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})
-        wandb.log(update_dict)
+        if self.log:
+            wandb.log(update_dict)
         return np.sum(profits_U), np.sum(profits_L), new_passenger_distribution, new_driver_distribution
 
     def step(self, actions, log):

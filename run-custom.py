@@ -20,7 +20,7 @@ parser.add_argument("--env_name", type=str, default='', help="Default petting zo
 parser.add_argument("--algo", type=str, default='ppo', help='algorithm to adjust (default : ppo)')
 parser.add_argument('--train', type=bool, default=True, help="(default: True)")
 parser.add_argument('--render', type=bool, default=False, help="(default: False)")
-parser.add_argument('--epochs', type=int, default=200, help='number of epochs, (default: 1)')
+parser.add_argument('--epochs', type=int, default=100, help='number of epochs, (default: 1)')
 parser.add_argument('--tensorboard', type=bool, default=False, help='use_tensorboard, (default: False)')
 parser.add_argument("--load", type=str, default='no', help='load network name in ./model_weights')
 parser.add_argument("--save_interval", type=int, default=100000, help='save interval(default: 100)')
@@ -64,7 +64,7 @@ init_driver_distribution2 = [500., 1000.]
 
 # Set vector_state to false in order to use visual observations (significantly longer training time)
 ts = 8*864000
-d = 0.5
+d = 0.1
 env_kwargs = {
     "OD":                                       np.array(OD2),
     "C":                                        np.array(C2),
@@ -113,12 +113,12 @@ class PPOAgent:
         self.log_prob = self.dist.log_prob(self.action).sum(-1, keepdim=True)
         return self.action.cpu().numpy().reshape(action_shape)
 
-    def record_transition(self, next_state, reward):
+    def record_transition(self, next_state, reward, done):
         transition = make_transition(state, \
                                      self.action.cpu().numpy(), \
                                      np.array([reward * args.reward_scaling]), \
                                      next_state, \
-                                     np.array([False]), \
+                                     np.array([done]), \
                                      self.log_prob.detach().cpu().numpy() \
                                      )
         self.agent.put_data(transition)
@@ -152,17 +152,17 @@ for n_epi in range(args.epochs):
         action_U = agent_U.sample_action(state)
         action_L = agent_L.sample_action(state)
         actions = {"U": action_U, "L": action_L}
-        log = agent_args.traj_length -1 == t
+        log = done = agent_args.traj_length -1 == t
         observations, rewards, terminations, truncations, infos = env.step(actions, log)
 
         next_state_ = observations["U"] # agents share observation, whichever's fine
         reward_U, reward_L = rewards["U"], rewards["L"]
 
         next_state = np.clip((next_state_ - state_rms.mean) / (state_rms.var ** 0.5 + 1e-8), -5, 5)
-        agent_U.record_transition(next_state, reward_U)
-        agent_L.record_transition(next_state, reward_L)
+        agent_U.record_transition(next_state, reward_U, done)
+        agent_L.record_transition(next_state, reward_L, done)
 
     agent_U.agent.train_net(n_epi)
     agent_L.agent.train_net(n_epi)
     state_rms.update(np.vstack(state_lst))
-    env.reset(seed=seed)
+    env.reset(seed=None)
