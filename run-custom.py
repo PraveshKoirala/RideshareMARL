@@ -64,7 +64,7 @@ init_driver_distribution2 = [500., 1000.]
 
 # Set vector_state to false in order to use visual observations (significantly longer training time)
 ts = 8*864000
-d = 0.1
+d = 0.5
 env_kwargs = {
     "OD":                                       np.array(OD2),
     "C":                                        np.array(C2),
