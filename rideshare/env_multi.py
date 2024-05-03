@@ -18,19 +18,16 @@ class MultiRideshareEnv(ParallelEnv):
         super(MultiRideshareEnv, self).__init__()
         self.render_mode = 'text'
         self.possible_agents = ["U", "L"]
-        # by how much they may change their rates/commission per iteration
-        self.change_rate = kwargs["change_rate"]
         self.max_rate = kwargs["max_rate"]  # Maximum rates
         self.OD = kwargs["OD"]  # the OD matrix
         self.C = kwargs["C"]  # Distance matrix
         self.N = self.OD.shape[0]  # number of nodes in OD matrix
-        self.max_timestep = kwargs["max_timestep"]  # max simulation step for one episode
         self.lbd = kwargs["lbd"]  # lambda > 0
         self.rp = kwargs["rp"]  # public price > 0
         self.g = kwargs["g"]  # gas cost > 0
         self.num_D_samples = kwargs["num_D_samples"]  # number of samples to generate for drivers at each iter
         self.a_d = kwargs["a_d"]  # delta a, by how much drivers may deviate at each iteration
-        self.p_d = kwargs["p_d"]  # delta p, by how much passengers may deviate at each iteration
+        self.p_d = kwargs["p_d"]  # delta p, by how much passengers may deviate at each iteration. [Deprecated, always responsive]
         self.init_passenger_distribution = kwargs["init_passenger_distribution"]
         self.init_driver_distribution = kwargs["init_driver_distribution"]
         self.passenger_population = sum(self.init_passenger_distribution)
@@ -45,8 +42,6 @@ class MultiRideshareEnv(ParallelEnv):
         assert isinstance(self.OD, np.ndarray), "OD matrix must be an array"
         assert len(self.OD.shape) == 2, "OD matrix must be 2D"
         assert self.OD.shape[0] == self.OD.shape[1], "OD matrix is a square matrix"
-        # assert np.sum(self.OD) == 1., "OD matrix must sum to 1"
-        # assert np.all(np.diag(self.OD) == 0.), "Diagonal of OD matrix is 0"
 
     def reset(self, seed, options=None):
         self.agents = copy(self.possible_agents)
@@ -55,13 +50,6 @@ class MultiRideshareEnv(ParallelEnv):
             np.random.seed(seed)
             random.seed(seed)
             torch.manual_seed(seed)
-
-        # Rates randomly initialized between the price range for each node
-        # RU = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))  # Rate for each edge
-        # # Commissions randomly initialized but greater than gas cost and less than the rates
-        # CU = np.random.uniform(low=self.g, high=RU, size=(self.N, self.N))
-        # RL = np.random.uniform(low=self.g, high=self.max_rate, size=(self.N, self.N))
-        # CL = np.random.uniform(low=self.g, high=RL, size=(self.N, self.N))
 
         # At each edge
         self.e = 0.1
@@ -263,7 +251,7 @@ class MultiRideshareEnv(ParallelEnv):
             CU = interp(CU_d)
             RL = interp(RL_d)
             CL = interp(CL_d)
-        elif self.mode == "delta":
+        else:
             raise Exception("Unknown mode")
 
         RU = np.clip(RU, a_min=self.g, a_max=self.max_rate)
@@ -299,27 +287,12 @@ class MultiRideshareEnv(ParallelEnv):
     @functools.lru_cache()
     def observation_space(self, agent):
         # each agent can observe the following:
-        #   the prevailing rate and commission of both agents (ru, cu, rl, cl)
         #   current supply / demand market activity (au, al, pu, pl, pp)
-        # RU, CU, RL, CL, Au, Al, PU, PL, PP, passenger_distribution, driver_distribution
+        #   passenger_distribution, driver_distribution
         from gymnasium.spaces import Box
         l = self.g
         h = self.max_rate
-        # The true space looks like this but using a dict space is too much trouble when it comes to training
-        # via not only pettingzoo but also stablebaselines. So we stick with trivial spaces like Box
-        # Dict({
-        #     "RU": Box(l, h, shape2d),
-        #     "CU": Box(l, h, shape2d),
-        #     "RL": Box(l, h, shape2d),
-        #     "CL": Box(l, h, shape2d),
-        #     "Au": Box(0., 1., shape1d),
-        #     "Al": Box(0., 1., shape1d),
-        #     "PU": Box(0., 1., shape2d),
-        #     "PL": Box(0., 1., shape2d),
-        #     "PP": Box(0., 1., shape2d),
-        #     "passenger_distribution": Box(0., self.passenger_population, shape1d),
-        #     "driver_distribution": Box(0., self.driver_population, shape1d)
-        # })
+        
         return Box(low=np.array( [0.] * (3 * self.N ** 2 + 4 * self.N)),
                    high=np.array( [1.] * (3 * self.N ** 2 + 2 * self.N) +
                         [self.passenger_population] * self.N + [self.driver_population] * self.N ))
