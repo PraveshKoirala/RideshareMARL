@@ -8,9 +8,10 @@ The PPO implementation used has been taken from https://github.com/seolhokim/Muj
 - pettingzoo
 - wandb
 
-_TODO: Update the requirements.txt_
+Use `pip install -r requirements.txt`
 
 # Instructions
 Configuration parameters for the PPO algorithm can be found in the config.ini
 OD matrix and the cost matrix can be directly changed in the run-custom.py
-Executing run-custom.py will start the simulation and progress can be tracked in wandb.
+Executing run-custom.py will start the simulation and progress can be tracked in `wandb`.
+Use the following to execute simulation: `python run-custom.py`
