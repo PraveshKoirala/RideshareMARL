@@ -20,7 +20,7 @@ parser.add_argument("--env_name", type=str, default='', help="Default petting zo
 parser.add_argument("--algo", type=str, default='ppo', help='algorithm to adjust (default : ppo)')
 parser.add_argument('--train', type=bool, default=True, help="(default: True)")
 parser.add_argument('--render', type=bool, default=False, help="(default: False)")
-parser.add_argument('--epochs', type=int, default=100, help='number of epochs, (default: 1)')
+parser.add_argument('--epochs', type=int, default=500, help='number of epochs, (default: 1)')
 parser.add_argument('--tensorboard', type=bool, default=False, help='use_tensorboard, (default: False)')
 parser.add_argument("--load", type=str, default='no', help='load network name in ./model_weights')
 parser.add_argument("--save_interval", type=int, default=100000, help='save interval(default: 100)')
@@ -64,7 +64,7 @@ init_driver_distribution2 = [500., 1000.]
 
 # Set vector_state to false in order to use visual observations (significantly longer training time)
 ts = 8*864000
-d = 0.1
+d = 0.05
 env_kwargs = {
     "OD":                                       np.array(OD2),
     "C":                                        np.array(C2),
@@ -145,7 +145,8 @@ seed = 42
 scoreU, score_L = 0.0, 0.0
 observations, infos = (env.reset(seed=seed))
 state_ = observations[possible_agents[0]]   # agents share the observation so doesn't really matter which dict we pull from
-state = np.clip((state_ - state_rms.mean) / (state_rms.var ** 0.5 + 1e-8), -5, 5)
+# state = np.clip((state_ - state_rms.mean) / (state_rms.var ** 0.5 + 1e-8), -5, 5)
+state = state_
 for n_epi in range(args.epochs):
     for t in range(agent_args.traj_length):
         state_lst.append(state_)
@@ -155,14 +156,15 @@ for n_epi in range(args.epochs):
         log = done = agent_args.traj_length -1 == t
         observations, rewards, terminations, truncations, infos = env.step(actions, log)
 
-        next_state_ = observations["U"] # agents share observation, whichever's fine
+        next_state_ = observations["U"] # agents share observations, whichever's fine
         reward_U, reward_L = rewards["U"], rewards["L"]
 
-        next_state = np.clip((next_state_ - state_rms.mean) / (state_rms.var ** 0.5 + 1e-8), -5, 5)
-        agent_U.record_transition(next_state, reward_U, done)
-        agent_L.record_transition(next_state, reward_L, done)
+        # next_state = np.clip((next_state_ - state_rms.mean) / (state_rms.var ** 0.5 + 1e-8), -5, 5)
+        next_state = next_state_
+        agent_U.record_transition(next_state, reward_U, False)
+        agent_L.record_transition(next_state, reward_L, False)
 
     agent_U.agent.train_net(n_epi)
     agent_L.agent.train_net(n_epi)
-    state_rms.update(np.vstack(state_lst))
+    # state_rms.update(np.vstack(state_lst))
     env.reset(seed=None)
