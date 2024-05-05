@@ -52,7 +52,7 @@ class MultiRideshareEnv(ParallelEnv):
             torch.manual_seed(seed)
 
         # At each edge
-        self.e = 0.1
+        self.e = 0.01
         PU = np.clip(0., 1., np.random.normal(1/3., 0.01, (self.N, self.N)))
         np.fill_diagonal(PU, 0.)
         PL = np.clip(0., PU, np.random.normal(1/3., 0.01, (self.N, self.N)))
@@ -215,8 +215,9 @@ class MultiRideshareEnv(ParallelEnv):
 
 
         # These are instanteneous profits
-        profits_U = (revenue_U - cost_U)
-        profits_L = (revenue_L - cost_L)
+        profits_U = alpha * (revenue_U - cost_U)
+        profits_L = alpha * (revenue_L - cost_L)
+
         update_dict = dict()
         if self.log:
             for i in range(self.N):
@@ -231,7 +232,7 @@ class MultiRideshareEnv(ParallelEnv):
                     update_dict.update({f'RL{tag}': RL[e], f'CL{tag}': CL[e]})
                     update_dict.update({f'PU{tag}': PU[e], f'PL{tag}': PL[e], f'PP{tag}': PP[e]})
                     update_dict.update({f'profits_U{tag}': profits_U[e], f'profits_L{tag}': profits_L[e]})
-            update_dict.update({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})
+            update_dict.update({'profits_U': np.sum(profits_U), 'profits_L': np.sum(profits_L)})  # log total profit
         if self.log:
             wandb.log(update_dict)
         return np.sum(profits_U), np.sum(profits_L), new_passenger_distribution, new_driver_distribution
@@ -269,8 +270,8 @@ class MultiRideshareEnv(ParallelEnv):
         observations = {a: self.flatten_obs(self.state) for a in self.agents}
 
         # Scale reward for stability
-        rewards = {"U": np.sum(profit_U)    * self.alpha,
-                   "L": np.sum(profit_L)    * self.alpha}
+        rewards = {"U": np.sum(profit_U),
+                   "L": np.sum(profit_L)}
 
         # agents never really terminate.
         terminations = {a: False for a in self.agents}
