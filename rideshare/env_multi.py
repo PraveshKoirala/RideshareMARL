@@ -6,7 +6,10 @@ import numpy as np
 import torch
 from pettingzoo.utils.env import ParallelEnv
 from torch.utils.tensorboard import SummaryWriter
-import wandb
+try:
+    import wandb  # real wandb if installed
+except ImportError:
+    from utils import file_logger as wandb  # file-backed shim otherwise
 writer = SummaryWriter()
 class MultiRideshareEnv(ParallelEnv):
     metadata = {
@@ -58,7 +61,7 @@ class MultiRideshareEnv(ParallelEnv):
         PL = np.clip(0., PU, np.random.normal(1/3., 0.01, (self.N, self.N)))
         np.fill_diagonal(PL, 0.)
         PP = 1 - PU - PL
-        np.fill_diagonal(PL, 0.)
+        np.fill_diagonal(PP, 0.)
         # At each node, uniformly want to drive for each platform
         Au = np.clip(0, 1., np.random.normal(1 / 2., self.e, self.N))
         Al = 1 - Au
@@ -132,11 +135,7 @@ class MultiRideshareEnv(ParallelEnv):
                         pl_ = (2 * lbd * al_ + al_ * au_ * (ru - rl) + al_ * (rp - rl)) / (2 * lbd * (au_ + al_ + 1))
                         pl_ = np.clip(pl_, 0., 1. - pu_)
                         pp_ = 1 - pu_ - pl_
-                    # Move the current allocation towards the optimal allocation for this candidate
-                    pu_, pl_, pp_ = (
-                        self.towards(PU[i, j], pu_, self.p_d),
-                        self.towards(PL[i, j], pl_, self.p_d),
-                        self.towards(PP[i, j], pp_, self.p_d))
+                    # Passengers are always instantaneously responsive
                     PU_[i, j] = pu_
                     PL_[i, j] = pl_
                     PP_[i, j] = pp_
